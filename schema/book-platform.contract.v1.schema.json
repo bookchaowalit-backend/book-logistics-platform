@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bookchaowalit-backend/bookchaowalit-backend-core/contracts/book-platform.contract.v1.schema.json",
+  "title": "Book Platform repository contract v1",
+  "description": "Machine-readable boundary contract for one Book Platform repository. Validated offline by scripts/check.py with a dependency-free JSON Schema subset (type, const, enum, pattern, minLength, minItems, uniqueItems, required, properties, additionalProperties, items, $ref).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "platform_id",
+    "repository",
+    "status",
+    "api_version",
+    "data_owner",
+    "capabilities",
+    "depends_on",
+    "current_implementation",
+    "migration"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "book-platform.contract.v1"},
+    "platform_id": {"$ref": "#/$defs/platform_id"},
+    "repository": {"type": "string", "pattern": "^book-[a-z0-9][a-z0-9-]{1,62}$"},
+    "status": {"enum": ["scaffolded", "pilot", "active", "retired"]},
+    "api_version": {"type": "string", "pattern": "^v[0-9]+$"},
+    "data_owner": {"type": "string", "pattern": "^(none|book-[a-z0-9][a-z0-9-]{1,62})$"},
+    "capabilities": {"$ref": "#/$defs/slug_list"},
+    "depends_on": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/platform_id"}
+    },
+    "current_implementation": {
+      "type": "object",
+      "required": ["repository", "source_path"],
+      "additionalProperties": false,
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$"},
+        "source_path": {"$ref": "#/$defs/relative_path_or_none"},
+        "source_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/relative_path"}
+        },
+        "source_status": {
+          "enum": [
+            "current-implementation-in-solo-empire",
+            "adjacent-domain-repository",
+            "new-boundary",
+            "implemented-in-this-repository"
+          ]
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "required": ["compatibility_adapter", "shadow_parity", "cutover", "rollback"],
+      "additionalProperties": false,
+      "properties": {
+        "compatibility_adapter": {"$ref": "#/$defs/non_empty"},
+        "shadow_parity": {"$ref": "#/$defs/non_empty"},
+        "cutover": {"$ref": "#/$defs/non_empty"},
+        "rollback": {"$ref": "#/$defs/non_empty"}
+      }
+    },
+    "migration_gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/non_empty"}
+    },
+    "surface_doc": {"$ref": "#/$defs/relative_path"},
+    "interfaces": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/interface"}
+    }
+  },
+  "$defs": {
+    "non_empty": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "platform_id": {
+      "enum": [
+        "api-gateway",
+        "identity",
+        "payment",
+        "commerce",
+        "logistics",
+        "communication",
+        "media",
+        "data",
+        "ai",
+        "workflow",
+        "security",
+        "observability",
+        "developer"
+      ]
+    },
+    "slug_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$"}
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9_.@/-]+$"
+    },
+    "relative_path_or_none": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(none|(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9_.@/-]+)$"
+    },
+    "interface": {
+      "type": "object",
+      "required": ["id", "kind", "direction", "name", "status", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,79}$"},
+        "kind": {"enum": ["http", "event", "cli", "object-store", "table", "config", "workflow"]},
+        "direction": {"enum": ["provides", "consumes"]},
+        "name": {"$ref": "#/$defs/non_empty"},
+        "status": {"enum": ["current-in-solo-empire", "implemented", "pilot", "planned"]},
+        "source": {"$ref": "#/$defs/relative_path_or_none"},
+        "contract": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,79}$"},
+        "auth": {"$ref": "#/$defs/non_empty"}
+      }
+    }
+  }
+}
