@@ -30,5 +30,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Verify vendored schema matches pinned canonical
+        run: python3 scripts/check_schema_pin.py
+
       - name: Run offline contract check and tests
         run: bash scripts/check.sh
