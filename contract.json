@@ -1,20 +1,40 @@
 {
+  "$schema": "./schema/book-platform.contract.v1.schema.json",
   "schema_version": "book-platform.contract.v1",
   "platform_id": "logistics",
   "repository": "book-logistics-platform",
   "status": "scaffolded",
   "api_version": "v1",
   "data_owner": "book-logistics-platform",
-  "capabilities": ["platform-api", "health", "contract"],
-  "depends_on": [],
+  "capabilities": [
+    "carrier-adapter",
+    "shipment",
+    "shipping-rate",
+    "label",
+    "tracking",
+    "fulfillment"
+  ],
+  "depends_on": [
+    "identity",
+    "observability"
+  ],
   "current_implementation": {
     "repository": "solo-empire",
-    "source_path": "none"
+    "source_path": "none",
+    "source_paths": [],
+    "source_status": "new-boundary"
   },
   "migration": {
     "compatibility_adapter": "required",
     "shadow_parity": "pending",
     "cutover": "pending",
     "rollback": "required"
-  }
+  },
+  "migration_gates": [
+    "carrier sandbox",
+    "label replay",
+    "tracking deduplication"
+  ],
+  "surface_doc": "docs/CONTRACT-SURFACE.md",
+  "interfaces": []
 }
