@@ -1,0 +1,8 @@
+system_id: bookchaowalit-backend/book-backend/book-logistics-platform
+prefix: CARD
+brand: "BOOK LOGISTICS PLATFORM"
+subtitle: "ขอบเขต contract ของ platform `logistics` ยังไม่มี runtime"
+footer: "Book Logistics Platform — Product Card"
+color: "#2f4b6e"
+audience: internal
+tier: L0
