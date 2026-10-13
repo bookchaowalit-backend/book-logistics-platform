@@ -21,10 +21,10 @@
     "$schema": {"type": "string", "minLength": 1},
     "schema_version": {"const": "book-platform.contract.v1"},
     "platform_id": {"$ref": "#/$defs/platform_id"},
-    "repository": {"type": "string", "pattern": "^book-[a-z0-9][a-z0-9-]{1,62}$"},
+    "repository": {"type": "string", "pattern": "^platform-[a-z0-9][a-z0-9-]{1,62}$"},
     "status": {"enum": ["scaffolded", "pilot", "active", "retired"]},
     "api_version": {"type": "string", "pattern": "^v[0-9]+$"},
-    "data_owner": {"type": "string", "pattern": "^(none|book-[a-z0-9][a-z0-9-]{1,62})$"},
+    "data_owner": {"type": "string", "pattern": "^(none|platform-[a-z0-9][a-z0-9-]{1,62})$"},
     "capabilities": {"$ref": "#/$defs/slug_list"},
     "depends_on": {
       "type": "array",
