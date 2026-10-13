@@ -2,10 +2,10 @@
   "$schema": "./schema/book-platform.contract.v1.schema.json",
   "schema_version": "book-platform.contract.v1",
   "platform_id": "logistics",
-  "repository": "book-logistics-platform",
+  "repository": "platform-logistics",
   "status": "scaffolded",
   "api_version": "v1",
-  "data_owner": "book-logistics-platform",
+  "data_owner": "platform-logistics",
   "capabilities": [
     "carrier-adapter",
     "shipment",

@@ -1,4 +1,4 @@
-# book-logistics-platform
+# platform-logistics
 
 `Logistics` platform boundary for the Book Platform portfolio.
 
@@ -12,8 +12,8 @@ provider integration, database writer, credential, or customer payload.
 ## Boundary
 
 - Owner: `bookchaowalit-backend`
-- Repository: `book-logistics-platform`
-- Target remote: `https://github.com/bookchaowalit-backend/book-logistics-platform.git` (published; runtime not activated)
+- Repository: `platform-logistics`
+- Target remote: `https://github.com/bookchaowalit-backend/platform-logistics.git` (published; runtime not activated)
 - Contract: `book-platform.contract.v1`
 - Status: `scaffolded`
 - Data owner: the platform boundary identified in `contract.json`
