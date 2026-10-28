@@ -292,3 +292,29 @@ GREEN: `bash scripts/check.sh` 43 unit tests OK; `ruff check .` clean.
 The database tests run in the CI `runtime` job against PostgreSQL 16; the image
 build is verified only by the CI `image` job (no local Docker). Nothing was
 pushed to a registry or deployed.
+
+## 422 only for domain input — 2026-10-29 (branch `invalid-input`)
+
+Ported from `platform-developer` `8047108` and `platform-commerce` `main`. The app
+mapped every `ValueError` to 422 `Invalid request`, so a server bug surfaced as a
+client error. Validation now raises `InvalidInput(ValueError)` (in
+`platform_logistics/errors.py`, re-exported by `store`), and only that maps to
+422. Request-schema errors keep the core's 422; any other exception, including an
+unexpected `ValueError`, is the shared core's redacted 500.
+
+`InvalidInput`: `rules.validate_parcel` / `validate_address` / `tracking_target`,
+`LogisticsStore.carrier` (unknown or unconfigured carrier, so label purchase and
+`reconcile` with an unconfigured carrier stay a plain 422 as in "Review fixes"),
+`validate_shipment`, `create_shipment` key, `list_shipments` limit and
+`validate_event`. Deliberately still a plain `ValueError` (never 422): the
+service-set `begin_label` lease and `finish_label` outcome arguments, and the
+`serve` command's "No carriers" startup exit. Readiness is unchanged.
+
+RED (`runtime_tests/test_error_mapping.py` written first): collection error,
+`InvalidInput` missing. With a temporary `InvalidInput = ValueError` stand-in:
+3 failed (`test_unexpected_value_error_is_redacted_500` `assert 422 == 500`, and
+the two "stays a plain ValueError" cases), 13 passed.
+
+GREEN: `PLATFORM_TEST_DSN=... pytest -q` 142 passed, no skips, against PostgreSQL 16
+(`pgserver`); `bash scripts/check.sh` 43 tests OK; `ruff check .` clean. Nothing
+deployed.

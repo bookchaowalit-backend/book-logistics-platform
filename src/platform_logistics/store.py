@@ -9,6 +9,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .carriers import CarrierError, Label
+from .errors import InvalidInput
 from .migrations import MIGRATIONS, TABLES
 from .rules import can_transition, tracking_target, validate_address, validate_parcel
 
@@ -99,7 +100,7 @@ class LogisticsStore:
     def carrier(self, name):
         carrier = self.carriers.get(name)
         if carrier is None or not carrier.configured:
-            raise ValueError('Unknown carrier')
+            raise InvalidInput('Unknown carrier')
         return carrier
 
     def quote(self, origin, destination, parcel):
@@ -111,24 +112,24 @@ class LogisticsStore:
 
     def validate_shipment(self, payload):
         if not isinstance(payload, dict) or set(payload) != SHIPMENT_FIELDS:
-            raise ValueError('Invalid shipment')
+            raise InvalidInput('Invalid shipment')
         if not isinstance(payload['reference'], str) or not REFERENCE.fullmatch(payload['reference']):
-            raise ValueError('Invalid shipment')
+            raise InvalidInput('Invalid shipment')
         if not isinstance(payload['recipient_ref'], str) or not RECIPIENT_REF.fullmatch(payload['recipient_ref']):
-            raise ValueError('Invalid shipment')
+            raise InvalidInput('Invalid shipment')
         validate_address(payload['origin'])
         validate_address(payload['destination'])
         validate_parcel(payload['parcel'])
         rates = self.carrier(payload['carrier']).quote(payload['origin'], payload['destination'], payload['parcel'])
         rate = next((r for r in rates if r['service'] == payload['service']), None)
         if rate is None:
-            raise ValueError('Invalid shipment')
+            raise InvalidInput('Invalid shipment')
         return rate
 
     def create_shipment(self, workspace, key, payload):
         """``(shipment, created)``. A replayed key returns the first shipment; a changed payload is Conflict."""
         if not valid_key(key):
-            raise ValueError('Invalid key')
+            raise InvalidInput('Invalid key')
         rate = self.validate_shipment(payload)
         expected = fingerprint(payload)
         o, d, p = payload['origin'], payload['destination'], payload['parcel']
@@ -156,7 +157,7 @@ class LogisticsStore:
 
     def list_shipments(self, workspace, limit=100, after=None):
         if type(limit) is not int or not 1 <= limit <= 100:
-            raise ValueError('Invalid limit')
+            raise InvalidInput('Invalid limit')
         with self.db.transaction(workspace) as conn, conn.cursor(row_factory=dict_row) as c:
             rows = c.execute(f'{SELECT_SHIPMENT} WHERE (%s::uuid IS NULL OR s.id>%s::uuid) ORDER BY s.id LIMIT %s',
                              (after, after, limit)).fetchall()
@@ -304,22 +305,22 @@ class LogisticsStore:
 
     def validate_event(self, event):
         if not isinstance(event, dict) or set(event) != EVENT_FIELDS:
-            raise ValueError('Invalid event')
+            raise InvalidInput('Invalid event')
         self.carrier(event['carrier'])
         if not valid_key(event['carrier_event_id']):
-            raise ValueError('Invalid event')
+            raise InvalidInput('Invalid event')
         if not isinstance(event['tracking_number'], str) or not TRACKING_NUMBER.fullmatch(event['tracking_number']):
-            raise ValueError('Invalid event')
+            raise InvalidInput('Invalid event')
         tracking_target('labelled', event['status'])  # raises for a status carriers cannot report
         at = event['occurred_at']
         if not isinstance(at, datetime) or at.tzinfo is None:
-            raise ValueError('Invalid event')
+            raise InvalidInput('Invalid event')
         try:
             at = at.astimezone(UTC)
         except OverflowError:
-            raise ValueError('Invalid event') from None
+            raise InvalidInput('Invalid event') from None
         if at < MIN_EVENT_TIME or at > datetime.now(UTC) + MAX_EVENT_SKEW:
-            raise ValueError('Invalid event')
+            raise InvalidInput('Invalid event')
         return fingerprint([event['tracking_number'], event['status'], at.isoformat()])
 
     def record_tracking_event(self, workspace, event):
