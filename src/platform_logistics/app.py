@@ -11,6 +11,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from .carriers import configured_carriers
 from .store import (
     Conflict,
+    InvalidInput,
     InvalidTransition,
     LabelInProgress,
     LabelRejected,
@@ -72,7 +73,9 @@ def create_app(database, verifier, *, carriers=None):
     app.state.readiness_checks['carriers'] = lambda: any(c.configured for c in carriers.values())
 
     # Every error is generic: no request values, carrier responses or addresses are echoed.
-    @app.exception_handler(ValueError)
+    # Only the domain InvalidInput is a client error; any other exception (an unexpected
+    # ValueError included) is a server bug and becomes the shared core's redacted 500.
+    @app.exception_handler(InvalidInput)
     async def invalid(request, exc):
         return json({'detail': 'Invalid request'}, 422)
 
