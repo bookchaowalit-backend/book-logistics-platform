@@ -16,3 +16,7 @@ testpaths = ["tests", "runtime_tests"]
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency markers are evaluated once by design.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "platform_backend_core.require_scope"]
+[tool.uv.sources]
+# Not on PyPI: lock the reviewed commit CI already installs, so the resolver can never
+# pick up a same-named PyPI package (dependency confusion).
+platform-backend-core = { git = "https://github.com/bookchaowalit-backend/platform-backend-core.git", rev = "d00e0119c2e47da3942d9c7b4b88828953f8bc5a" }
