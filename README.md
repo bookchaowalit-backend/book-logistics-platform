@@ -6,8 +6,9 @@
 
 This repository owns the `logistics` capability: carrier adapters, shipment, shipping rates, labels, tracking.
 The current source implementation is recorded as `none` in the
-parent registry. This checkout is a local scaffold; it contains no production
-provider integration, database writer, credential, or customer payload.
+parent registry. This checkout includes an optional, locally implemented runtime pilot with a
+sandbox carrier only. Its contract remains scaffolded pending activation evidence; it holds no
+real carrier integration, credential or customer payload, and no production activation is claimed.
 
 ## Boundary
 
@@ -63,3 +64,11 @@ Before activating a remote or changing a consumer, add sanitized fixtures for
 success, duplicate delivery, timeout and provider failure; prove tenant/privacy
 isolation; compare the old and new contract; and rehearse rollback on a
 disposable state store. Record the evidence in the parent platform registry.
+
+## Runtime pilot — implemented locally, staged only
+
+A Python 3.12+ / PostgreSQL 16+ runtime on `platform-backend-core`: workspace JWT scopes,
+forced row-level security, idempotent shipments, deterministic sandbox rates, replay-safe
+label purchase with an uncertain quarantine, and tracking events deduplicated by carrier
+event id. See the [API and operating guide](docs/runtime.md). The original contract,
+schema pin and offline checks are unchanged. Nothing has been deployed.
