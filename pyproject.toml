@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "platform-logistics"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["platform-backend-core==0.1.0", "uvicorn>=0.34,<1"]
+[project.optional-dependencies]
+test = ["pytest>=8", "httpx>=0.28,<1"]
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+pythonpath = ["src", "runtime_tests"]
+testpaths = ["tests", "runtime_tests"]
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers are evaluated once by design.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "platform_backend_core.require_scope"]
