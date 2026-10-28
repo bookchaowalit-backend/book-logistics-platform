@@ -5,6 +5,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import psycopg
 from psycopg.rows import dict_row
 
 from .carriers import CarrierError, Label
@@ -21,6 +22,8 @@ RECIPIENT_REF = re.compile(r'[A-Za-z0-9_.:-]{1,128}')
 EVENT_FIELDS = {'carrier', 'carrier_event_id', 'tracking_number', 'status', 'occurred_at'}
 EVENT_COLUMNS = 'carrier,carrier_event_id,status,occurred_at,outcome,received_at'
 MAX_EVENT_SKEW = timedelta(days=1)
+# Carrier events before this are malformed, never real tracking history.
+MIN_EVENT_TIME = datetime(2000, 1, 1, tzinfo=UTC)
 SHIPMENT_FIELDS = {'reference', 'recipient_ref', 'carrier', 'service', 'origin', 'destination', 'parcel'}
 SHIPMENT_COLUMNS = ('s.id,s.reference,s.recipient_ref,s.carrier,s.service,s.origin_country,s.origin_postal_code,'
                     's.destination_country,s.destination_postal_code,s.weight_grams,s.length_mm,s.width_mm,s.height_mm,'
@@ -233,13 +236,19 @@ class LogisticsStore:
         """``(purchased|replayed, shipment)``, None for an unknown shipment.
 
         Raises LabelInProgress, LabelUncertain, LabelRejected or InvalidTransition."""
+        shipment = self.get_shipment(workspace, id)
+        if shipment is None:
+            return None
+        # Resolve the carrier before taking a lease: an unconfigured carrier was never called,
+        # so it must be a plain rejection, not a quarantined uncertain label.
+        carrier = self.carrier(shipment['carrier'])
         begun = self.begin_label(workspace, id)
         if begun is None or isinstance(begun, tuple):
             return begun
         shipment = self.get_shipment(workspace, id)
         label, outcome = None, 'uncertain'
         try:
-            label = self.carrier(shipment['carrier']).purchase_label(shipment, 'label/' + str(id))
+            label = carrier.purchase_label(shipment, 'label/' + str(id))
             outcome = 'purchased'
         except CarrierError as exc:
             outcome = exc.outcome
@@ -272,19 +281,24 @@ class LogisticsStore:
             raise LabelInProgress()
         if shipment['label']['status'] != 'uncertain':
             return shipment['label']['status'], shipment
+        carrier = self.carrier(shipment['carrier'])  # unconfigured: a rejection, the label stays uncertain
         try:
-            found = self.carrier(shipment['carrier']).find_label('label/' + str(id))
+            found = carrier.find_label('label/' + str(id))
         except Exception:  # noqa: BLE001 - an unanswered lookup settles nothing
             raise LabelUncertain() from None
         if found is not None and not valid_label(found):
             raise LabelUncertain()
         status, target = ('purchased', 'labelled') if found else ('failed', 'created')
-        with self.db.transaction(workspace) as c:
-            if c.execute("UPDATE shipment_label SET status=%s,tracking_number=%s,label_ref=%s,updated_at=clock_timestamp() "
-                         "WHERE shipment_id=%s AND status='uncertain' RETURNING shipment_id",
-                         (status, found and found.tracking_number, found and found.label_ref, id)).fetchone():
-                c.execute("UPDATE shipment SET status=%s,updated_at=clock_timestamp() WHERE id=%s AND status='label_uncertain'",
-                          (target, id))
+        try:
+            with self.db.transaction(workspace) as c:
+                if c.execute("UPDATE shipment_label SET status=%s,tracking_number=%s,label_ref=%s,updated_at=clock_timestamp() "
+                             "WHERE shipment_id=%s AND status='uncertain' RETURNING shipment_id",
+                             (status, found and found.tracking_number, found and found.label_ref, id)).fetchone():
+                    c.execute("UPDATE shipment SET status=%s,updated_at=clock_timestamp() WHERE id=%s AND status='label_uncertain'",
+                              (target, id))
+        except psycopg.errors.UniqueViolation:
+            # The carrier reported a tracking number another shipment holds: settle nothing.
+            raise LabelUncertain() from None
         current = self.get_shipment(workspace, id)
         return current['label']['status'], current
 
@@ -298,9 +312,15 @@ class LogisticsStore:
             raise ValueError('Invalid event')
         tracking_target('labelled', event['status'])  # raises for a status carriers cannot report
         at = event['occurred_at']
-        if not isinstance(at, datetime) or at.tzinfo is None or at > datetime.now(UTC) + MAX_EVENT_SKEW:
+        if not isinstance(at, datetime) or at.tzinfo is None:
             raise ValueError('Invalid event')
-        return fingerprint([event['tracking_number'], event['status'], at.astimezone(UTC).isoformat()])
+        try:
+            at = at.astimezone(UTC)
+        except OverflowError:
+            raise ValueError('Invalid event') from None
+        if at < MIN_EVENT_TIME or at > datetime.now(UTC) + MAX_EVENT_SKEW:
+            raise ValueError('Invalid event')
+        return fingerprint([event['tracking_number'], event['status'], at.isoformat()])
 
     def record_tracking_event(self, workspace, event):
         """``(applied|recorded|duplicate, shipment)``; None when no purchased label has the tracking number.

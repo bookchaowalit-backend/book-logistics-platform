@@ -233,3 +233,24 @@ the Railway deployment approval step. Each step needs the owner's go.
    event posted twice is `applied` then `duplicate`.
 4. Only then: Sentry, the uptime monitor, a real carrier sandbox adapter with its
    own review, and a first consumer with a rollback path.
+
+## Review fixes — 2026-10-29
+
+Independent review (changes requested) found one medium and three low issues; the
+tests in `runtime_tests/test_review_fixes.py` failed first (5 of 5) and pass now.
+
+- An unconfigured carrier is resolved before the label lease, so `POST /label` is a
+  plain 422 and the shipment stays `created`; it is never quarantined as `uncertain`
+  for a carrier that was not called. `reconcile` with an unconfigured carrier is 422
+  and leaves the label `uncertain`.
+- A reconcile whose carrier reports a tracking number another shipment already holds
+  stays `uncertain` (409) instead of failing with a 500.
+- Event times that overflow on UTC conversion or predate 2000-01-01 are invalid (422).
+
+Requirements on any real carrier adapter before it replaces the sandbox: purchases
+must be idempotent on the `label/<shipment id>` key, every call must time out well
+inside the 60-second lease, and `find_label` must be authoritative (a `None` answer
+allows a new purchase). The sandbox keeps its ledger in memory, so run it as a single
+process.
+
+Full suite: 119 passed against PostgreSQL 16.2, Python 3.12.
