@@ -17,11 +17,32 @@ The three migration gates in the registry map to code and tests:
 
 ## Installation and lifecycle
 
-Python >=3.12, PostgreSQL >=16. Build and review wheels for this repository and
-`platform-backend-core==0.1.0`; a release bundles all transitive wheels in
-`wheelhouse/` for the `Dockerfile`. Nothing is published to PyPI. `Dockerfile`
-and `railway.toml` are reference release assets; no image was built and nothing
-was deployed.
+Python >=3.12, PostgreSQL >=16. Nothing is published to PyPI. `railway.toml` is a
+reference release asset; nothing was deployed.
+
+### Container image
+
+`docker build .` works from a clean checkout; no pre-staged `wheelhouse/` is
+needed. The `Dockerfile` is two stages:
+
+1. `build` (`python:3.12-slim` plus `git`): `pip wheel` builds this service's wheel
+   and `platform-backend-core` from the same reviewed commit CI installs
+   (`d00e0119c2e47da3942d9c7b4b88828953f8bc5a`), with all transitive dependencies.
+2. `runtime` (`python:3.12-slim`, no git, no build tools): installs only those
+   wheels with `--no-index`, runs as UID/GID `65532`, `PORT=8080`, and keeps
+   `CMD ["python", "-m", "platform_logistics", "serve"]`. Run `migrate` as a
+   separate one-off with the DDL-role `DATABASE_URL` (same image, command override).
+
+`.dockerignore` keeps `.git`, `.venv`, build output and `.env*` out of the build
+context. CI job `image` in `shared-runtime.yml` runs `docker build` on every push
+and pull request, then checks that the image imports the service and runs as a
+non-root user. It never pushes or deploys. `tests/test_build_hygiene.py`
+(part of `scripts/check.sh`) fails if the Dockerfile copies a git-ignored path,
+stops being multi-stage, pins a core commit other than the workflow's, runs the
+final stage as root or changes the CMD, if CI stops building the image, or if any
+workflow `uses:` is not pinned to a 40-hex commit SHA (tags go in a trailing
+comment). Upgrading the core means changing the commit in the workflow, the
+Dockerfile and `[tool.uv.sources]` together; the tests fail on any mismatch.
 
 - `python -m platform_logistics migrate`: explicit migration with the DDL-role
   `DATABASE_URL` (namespace `logistics`). The API never migrates at startup.
@@ -224,8 +245,8 @@ the Railway deployment approval step. Each step needs the owner's go.
 1. Dedicated database, a DDL role for `migrate` and a NOSUPERUSER NOBYPASSRLS
    runtime role with the grants above. Connection strings to Infisical
    `/platform-logistics`.
-2. Build the `wheelhouse/` (this wheel plus `platform-backend-core` at the CI pin
-   and dependencies) and deploy one Railway service for `serve` with
+2. `docker build .` (see "Container image"; CI already builds it on every push)
+   and deploy one Railway service for `serve` with
    `LOGISTICS_CARRIERS=sandbox` and JWT issuer `empire-platform`. Run `migrate`
    once with the DDL role.
 3. Smoke test: `/readyz` 200; a quote; a shipment created twice with one key
@@ -254,3 +275,20 @@ allows a new purchase). The sandbox keeps its ledger in memory, so run it as a s
 process.
 
 Full suite: 119 passed against PostgreSQL 16.2, Python 3.12.
+
+## Build hygiene — 2026-10-29 (branch `build-hygiene`)
+
+Ported from `platform-developer` `8047108`: the `Dockerfile` is now the
+multi-stage clean-checkout build under "Container image", every workflow action
+is pinned to a commit SHA (`11d5960a...` = `actions/checkout` v4,
+`a26af69b...` = `actions/setup-python` v5, tag in a trailing comment), and the
+new CI job `image` builds the image without pushing it. Error handling is
+unchanged.
+
+RED (test written first, run against the old files): `python3 -m unittest
+tests.test_build_hygiene`: 5 of 7 failed (unpinned `actions/checkout@v4` / `actions/setup-python@v5` in both workflows; `wheelhouse` in the Dockerfile; one `FROM`; no core commit in the Dockerfile; no `docker build` step). The checker self-test and the existing non-root `USER` passed.
+
+GREEN: `bash scripts/check.sh` 43 unit tests OK; `ruff check .` clean.
+The database tests run in the CI `runtime` job against PostgreSQL 16; the image
+build is verified only by the CI `image` job (no local Docker). Nothing was
+pushed to a registry or deployed.
