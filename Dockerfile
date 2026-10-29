@@ -9,7 +9,7 @@ WORKDIR /src
 COPY pyproject.toml ./
 COPY src/ src/
 RUN pip wheel --no-cache-dir --wheel-dir /wheels \
-    'platform-backend-core @ git+https://github.com/bookchaowalit-backend/platform-backend-core.git@88306b28228f789eecd214a11ca8a0640e9d6233' \
+    'platform-backend-core @ git+https://github.com/bookchaowalit-backend/platform-backend-core.git@21d5f44d26220080cbed43b9807979dc84a8533a' \
     .
 
 FROM python:3.12-slim AS runtime
