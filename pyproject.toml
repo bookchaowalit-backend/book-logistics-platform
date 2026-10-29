@@ -19,4 +19,4 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", 
 [tool.uv.sources]
 # Not on PyPI: lock the reviewed commit CI already installs, so the resolver can never
 # pick up a same-named PyPI package (dependency confusion).
-platform-backend-core = { git = "https://github.com/bookchaowalit-backend/platform-backend-core.git", rev = "88306b28228f789eecd214a11ca8a0640e9d6233" }
+platform-backend-core = { git = "https://github.com/bookchaowalit-backend/platform-backend-core.git", rev = "21d5f44d26220080cbed43b9807979dc84a8533a" }
